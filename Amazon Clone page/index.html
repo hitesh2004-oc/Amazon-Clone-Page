@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Advanced Amazon-like Store (Demo)</title>
+  <style>
+    /* Reset & base */
+    :root{
+      --primary:#ff9900; /* Amazon-like */
+      --dark:#111;
+      --muted:#666;
+      --card:#fff;
+      --glass: rgba(255,255,255,0.04);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial}
+    body{background:#f3f5f7;color:var(--dark);line-height:1.4}
+
+    /* Layout */
+    .topbar{background:#131921;color:#fff;display:flex;align-items:center;padding:10px 18px;gap:16px}
+    .logo{display:flex;align-items:center;gap:8px;font-weight:700}
+    .logo img{height:36px}
+    .searchbar{flex:1;display:flex;align-items:center}
+    .searchbar input{flex:1;padding:10px;border-radius:4px 0 0 4px;border:none;outline:none}
+    .searchbar button{background:var(--primary);border:none;padding:10px 14px;border-radius:0 4px 4px 0;cursor:pointer}
+    .top-actions{display:flex;gap:12px;align-items:center}
+    .top-actions button{background:transparent;border:1px solid rgba(255,255,255,0.12);color:#fff;padding:8px 10px;border-radius:4px;cursor:pointer}
+
+    /* Nav categories */
+    .nav-cats{display:flex;gap:12px;padding:10px 18px;background:#fff;border-bottom:1px solid #e6e6e6}
+    .nav-cats a{color:#333;text-decoration:none;padding:8px;border-radius:6px}
+    .nav-cats a:hover{background:#f3f3f3}
+
+    /* Main content */
+    .container{max-width:1200px;margin:18px auto;padding:0 12px;display:grid;grid-template-columns:260px 1fr;gap:18px}
+
+    /* Sidebar filters */
+    .filters{background:var(--card);padding:14px;border-radius:8px;border:1px solid #e8e8e8}
+    .filter-group{margin-bottom:14px}
+    .filter-group h4{margin:0 0 8px 0}
+    .price-range{display:flex;gap:8px}
+    .price-range input{width:100%;padding:8px;border:1px solid #ddd;border-radius:6px}
+    .checkbox-list label{display:flex;align-items:center;gap:8px;padding:6px 0}
+
+    /* Content area */
+    .hero{display:flex;gap:18px}
+    .carousel{flex:1;background:linear-gradient(180deg,#fff,#fafafa);border-radius:8px;padding:12px;min-height:220px;display:flex;align-items:center;justify-content:center;position:relative}
+    .hero-aside{width:260px;background:linear-gradient(180deg,#fff,#fafafa);border-radius:8px;padding:12px}
+    .carousel .slides{display:flex;gap:12px;overflow:hidden;width:100%}
+    .slide{min-width:100%;display:flex;align-items:center;gap:14px}
+    .slide img{width:320px;height:160px;object-fit:cover;border-radius:6px}
+    .carousel .controls{position:absolute;top:50%;left:12px;right:12px;display:flex;justify-content:space-between;transform:translateY(-50%)}
+    .carousel button{background:rgba(0,0,0,0.4);color:#fff;border:none;padding:8px;border-radius:6px;cursor:pointer}
+
+    /* Product grid */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-top:16px}
+    .card{background:var(--card);padding:12px;border-radius:8px;border:1px solid #e8e8e8;display:flex;flex-direction:column;gap:8px}
+    .card img{width:100%;height:160px;object-fit:cover;border-radius:6px}
+    .card .title{font-size:14px;font-weight:600}
+    .card .desc{font-size:12px;color:var(--muted)}
+    .price-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    .price{font-weight:700}
+    .rating{background:#f2c94c;padding:4px 6px;border-radius:4px;font-size:12px}
+    .card button{padding:8px;border-radius:6px;border:none;cursor:pointer}
+    .add{background:var(--primary);color:#111}
+    .wishlist{background:#fff;border:1px solid #ddd}
+
+    /* Quick view modal */
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:200}
+    .modal .box{width:min(920px,96%);background:#fff;border-radius:8px;padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    .modal img{width:100%;height:320px;object-fit:cover;border-radius:6px}
+
+    /* Cart drawer */
+    .cart-drawer{position:fixed;right:0;top:0;height:100%;width:360px;background:#fff;transform:translateX(110%);transition:transform .28s ease;z-index:220;border-left:1px solid #eee;padding:16px;overflow:auto}
+    .cart-drawer.open{transform:translateX(0)}
+    .cart-item{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+    .cart-item img{width:64px;height:64px;object-fit:cover;border-radius:6px}
+
+    /* Footer */
+    footer{max-width:1200px;margin:18px auto;padding:24px;color:var(--muted);font-size:13px}
+
+    /* Responsive */
+    @media (max-width:900px){
+      .container{grid-template-columns:1fr}
+      .hero-aside{display:none}
+      .top-actions{display:none}
+      .nav-cats{overflow:auto}
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="logo"><img src="amazonlogo.png" alt="logo" style="width:100px;height:28px;background:linear-gradient(90deg,var(--primary),#ffb84d);border-radius:4px"> <span style="font-size:18px">Store</span></div>
+    <div class="searchbar">
+      <input id="searchInput" placeholder="Search products, brands and categories" />
+      <button id="searchBtn">Search</button>
+    </div>
+    <div class="top-actions">
+      <button id="accountBtn">Account</button>
+      <button id="ordersBtn">Orders</button>
+      <button id="cartBtn">Cart (<span id="cartCount">0</span>)</button>
+    </div>
+  </header>
+
+  <nav class="nav-cats" id="navCats">
+    <!-- categories populated by JS -->
+  </nav>
+
+  <main class="container">
+    <aside class="filters">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><h3 style="margin:0">Filters</h3><button id="clearFilters">Clear</button></div>
+      <div class="filter-group">
+        <h4>Categories</h4>
+        <div class="checkbox-list" id="catFilters"></div>
+      </div>
+      <div class="filter-group">
+        <h4>Price</h4>
+        <div class="price-range">
+          <input id="minPrice" placeholder="Min" type="number" />
+          <input id="maxPrice" placeholder="Max" type="number" />
+        </div>
+        <div style="margin-top:8px"><button id="applyPrice">Apply</button></div>
+      </div>
+      <div class="filter-group">
+        <h4>Rating</h4>
+        <div class="checkbox-list" id="ratingFilters"></div>
+      </div>
+    </aside>
+
+    <section>
+      <div class="hero">
+        <div class="carousel">
+          <div class="slides" id="slides">
+            <!-- slides by JS -->
+          </div>
+          <div class="controls">
+            <button id="prevSlide">◀</button>
+            <button id="nextSlide">▶</button>
+          </div>
+        </div>
+        <div class="hero-aside">
+          <h4>Today\'s Deals</h4>
+          <div id="deals"></div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px">
+        <h2 id="resultsTitle">Featured Products</h2>
+        <div>
+          <label>Sort: <select id="sortSelect"><option value="relevance">Relevance</option><option value="price-asc">Price: Low &uarr;</option><option value="price-desc">Price: High &darr;</option><option value="rating">Top Rated</option></select></label>
+        </div>
+      </div>
+
+      <div class="grid" id="grid">
+        <!-- product cards populated by JS -->
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Built as a demo — not for commercial use. Use this template to prototype features like search, filters, cart, quick-view modal, and responsive layout.
+  </footer>
+
+  <!-- Modal Quick View -->
+  <div id="modal" class="modal" role="dialog" aria-hidden="true">
+    <div class="box" role="document">
+      <div>
+        <img id="modalImg" src="" alt="product image" />
+      </div>
+      <div>
+        <h3 id="modalTitle"></h3>
+        <p id="modalDesc" class="desc"></p>
+        <div style="display:flex;gap:12px;align-items:center;margin:12px 0"><div id="modalPrice" class="price"></div><div id="modalRating" class="rating"></div></div>
+        <div style="display:flex;gap:8px"><button id="modalAdd" class="add">Add to cart</button><button id="modalClose" class="wishlist">Close</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cart Drawer -->
+  <div id="cartDrawer" class="cart-drawer" aria-hidden="true">
+    <h3>Your Cart</h3>
+    <div id="cartItems"></div>
+    <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center"><strong>Total:</strong><strong id="cartTotal">₹0</strong></div>
+    <div style="margin-top:12px"><button id="checkoutBtn">Proceed to checkout</button></div>
+  </div>
+
+  <script>
+    /***** Sample product data (in real app fetch from API) *****/
+    const products = [
+      {id:1,title:'Wireless Noise-Cancelling Headphones',desc:'Over-ear, 30h battery, fast charge',price:8999,category:'Electronics',rating:4.6,img:'https://picsum.photos/id/180/600/400'},
+      {id:2,title:'Stainless Steel Water Bottle 1L',desc:'Leakproof, insulated',price:799,category:'Home & Kitchen',rating:4.2,img:'https://picsum.photos/id/21/600/400'},
+      {id:3,title:'Smart LED TV 43" 4K',desc:'HDR10+, Dolby Audio',price:27999,category:'Electronics',rating:4.4,img:'https://picsum.photos/id/1060/600/400'},
+      {id:4,title:'Running Shoes (Men)',desc:'Breathable mesh, cushioned sole',price:2499,category:'Fashion',rating:4.3,img:'https://picsum.photos/id/1011/600/400'},
+      {id:5,title:'Bluetooth Speaker (Portable)',desc:'Water-resistant, 12h playtime',price:1299,category:'Electronics',rating:4.0,img:'https://picsum.photos/id/1080/600/400'},
+      {id:6,title:'Cookware Set - 6 pcs',desc:'Non-stick, oven-safe',price:4599,category:'Home & Kitchen',rating:4.5,img:'https://picsum.photos/id/25/600/400'},
+      {id:7,title:'Mechanical Keyboard',desc:'RGB, tactile switches',price:3499,category:'Electronics',rating:4.7,img:'https://picsum.photos/id/1042/600/400'},
+      {id:8,title:'Backpack - 30L',desc:'Laptop compartment, USB port',price:1599,category:'Fashion',rating:4.1,img:'https://picsum.photos/id/1005/600/400'},
+      {id:9,title:'Instant Coffee 500g',desc:'Rich aroma, medium roast',price:599,category:'Grocery',rating:4.2,img:'https://picsum.photos/id/29/600/400'},
+      {id:10,title:'Smartwatch with Health Tracking',desc:'Heart-rate, sleep tracking',price:6999,category:'Electronics',rating:4.0,img:'https://picsum.photos/id/1069/600/400'}
+    ];
+
+    /* State */
+    let state = {
+      products: [...products],
+      filters: {categories: new Set(), minPrice: null, maxPrice: null, ratings: new Set()},
+      sort: 'relevance',
+      cart: {}
+    }
+
+    /* Utilities */
+    const qs = s => document.querySelector(s);
+    const qsa = s => Array.from(document.querySelectorAll(s));
+
+    /* Populate nav categories */
+    function initCategories(){
+      const cats = [...new Set(products.map(p=>p.category))];
+      const nav = qs('#navCats');
+      nav.innerHTML = '';
+      cats.forEach(c=>{
+        const a = document.createElement('a'); a.href='#'; a.textContent = c; a.addEventListener('click',e=>{e.preventDefault(); toggleCategory(c);});
+        nav.appendChild(a);
+      });
+
+      // sidebar checkboxes
+      const catFilters = qs('#catFilters'); catFilters.innerHTML = '';
+      cats.forEach(c=>{
+        const id = 'cat-'+c.replace(/\s+/g,'');
+        const label = document.createElement('label');
+        label.innerHTML = `<input type='checkbox' data-cat='${c}' id='${id}'> <span>${c}</span>`;
+        catFilters.appendChild(label);
+      });
+
+      // rating filters
+      const ratingFilters = qs('#ratingFilters'); ratingFilters.innerHTML = '';
+      [4.5,4,3.5,3].forEach(r=>{
+        const id = 'r-'+r;
+        const label = document.createElement('label');
+        label.innerHTML = `<input type='checkbox' data-rating='${r}' id='${id}'> <span>&ge; ${r} stars</span>`;
+        ratingFilters.appendChild(label);
+      });
+
+      // wire up checkbox listeners
+      qsa('#catFilters input').forEach(inp=>inp.addEventListener('change',e=>{
+        const c = e.target.dataset.cat;
+        if(e.target.checked) state.filters.categories.add(c); else state.filters.categories.delete(c);
+        applyFilters();
+      }));
+      qsa('#ratingFilters input').forEach(inp=>inp.addEventListener('change',e=>{
+        const r = Number(e.target.dataset.rating);
+        if(e.target.checked) state.filters.ratings.add(r); else state.filters.ratings.delete(r);
+        applyFilters();
+      }));
+    }
+
+    function toggleCategory(cat){
+      const checkbox = qs(`#catFilters input[data-cat='${cat}']`);
+      if(!checkbox) return;
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event('change'));
+    }
+
+    /* Carousel */
+    let slideIndex = 0;
+    function initCarousel(){
+      const slidesEl = qs('#slides');
+      const banners = [
+        {img:'https://picsum.photos/id/1018/1200/500',title:'Big Savings on Electronics'},
+        {img:'https://picsum.photos/id/1015/1200/500',title:'Home & Kitchen Deals'},
+        {img:'https://picsum.photos/id/1005/1200/500',title:'Fashion for All'}
+      ];
+      slidesEl.innerHTML = '';
+      banners.forEach(b=>{
+        const slide = document.createElement('div'); slide.className='slide';
+        slide.innerHTML = `<img src='${b.img}' alt='${b.title}' /><div><h3>${b.title}</h3><p>Shop trending deals</p></div>`;
+        slidesEl.appendChild(slide);
+      });
+      qs('#nextSlide').addEventListener('click',()=>{moveSlide(1)});
+      qs('#prevSlide').addEventListener('click',()=>{moveSlide(-1)});
+      setInterval(()=>{moveSlide(1)},5000);
+      updateSlidePosition();
+    }
+    function moveSlide(dir){
+      const slides = qs('#slides');
+      const count = slides.children.length;
+      slideIndex = (slideIndex + dir + count) % count;
+      updateSlidePosition();
+    }
+    function updateSlidePosition(){
+      const slides = qs('#slides');
+      slides.style.transform = `translateX(-${slideIndex*100}%)`;
+    }
+
+    /* Render product grid */
+    function renderGrid(list){
+      const grid = qs('#grid'); grid.innerHTML = '';
+      list.forEach(p=>{
+        const card = document.createElement('div'); card.className='card';
+        card.innerHTML = `
+          <img loading='lazy' src='${p.img}' alt='${p.title}' />
+          <div class='title'>${p.title}</div>
+          <div class='desc'>${p.desc}</div>
+          <div class='price-row'><div class='price'>₹${p.price.toLocaleString()}</div><div class='rating'>${p.rating} ★</div></div>
+          <div style='display:flex;gap:8px;margin-top:6px'><button class='add' data-id='${p.id}'>Add to cart</button><button class='wishlist' data-id='${p.id}'>Quick view</button></div>
+        `;
+        grid.appendChild(card);
+      });
+
+      // attach listeners
+      qsa('.card .add').forEach(btn=>btn.addEventListener('click',e=>{addToCart(Number(e.target.dataset.id))}));
+      qsa('.card .wishlist').forEach(btn=>btn.addEventListener('click',e=>{openQuickView(Number(e.target.dataset.id))}));
+    }
+
+    /* Filters & sorting */
+    function applyFilters(){
+      let list = [...products];
+      const f = state.filters;
+      if(f.categories.size>0) list = list.filter(p=>f.categories.has(p.category));
+      if(f.minPrice) list = list.filter(p=>p.price >= f.minPrice);
+      if(f.maxPrice) list = list.filter(p=>p.price <= f.maxPrice);
+      if(f.ratings.size>0){
+        const minReq = Math.min(...Array.from(f.ratings));
+        list = list.filter(p=>p.rating >= minReq);
+      }
+      // sorting
+      if(state.sort==='price-asc') list.sort((a,b)=>a.price-b.price);
+      if(state.sort==='price-desc') list.sort((a,b)=>b.price-a.price);
+      if(state.sort==='rating') list.sort((a,b)=>b.rating-b.rating?b.rating-a.rating:0);
+
+      renderGrid(list);
+      qs('#resultsTitle').textContent = `Products (${list.length})`;
+    }
+
+    /* Search */
+    qs('#searchBtn').addEventListener('click',()=>{
+      const q = qs('#searchInput').value.trim().toLowerCase();
+      if(!q){ applyFilters(); return; }
+      const list = products.filter(p=> (p.title+p.desc+p.category).toLowerCase().includes(q));
+      renderGrid(list);
+      qs('#resultsTitle').textContent = `Search results for "${q}" (${list.length})`;
+    });
+
+    /* Sort */
+    qs('#sortSelect').addEventListener('change',e=>{ state.sort = e.target.value; applyFilters(); });
+
+    /* Price apply */
+    qs('#applyPrice').addEventListener('click',()=>{
+      const min = Number(qs('#minPrice').value) || null;
+      const max = Number(qs('#maxPrice').value) || null;
+      state.filters.minPrice = min; state.filters.maxPrice = max; applyFilters();
+    });
+    qs('#clearFilters').addEventListener('click',()=>{
+      state.filters = {categories:new Set(),minPrice:null,maxPrice:null,ratings:new Set()};
+      qsa('#catFilters input, #ratingFilters input').forEach(i=>i.checked=false);
+      qs('#minPrice').value=''; qs('#maxPrice').value=''; applyFilters();
+    });
+
+    /* Quick view modal */
+    function openQuickView(id){
+      const p = products.find(x=>x.id===id); if(!p) return;
+      qs('#modalImg').src = p.img; qs('#modalTitle').textContent = p.title; qs('#modalDesc').textContent = p.desc; qs('#modalPrice').textContent = `₹${p.price.toLocaleString()}`; qs('#modalRating').textContent = `${p.rating} ★`;
+      qs('#modal').style.display = 'flex'; qs('#modal').setAttribute('aria-hidden','false');
+      qs('#modalAdd').onclick = ()=>{ addToCart(p.id); closeModal(); }
+    }
+    function closeModal(){ qs('#modal').style.display='none'; qs('#modal').setAttribute('aria-hidden','true'); }
+    qs('#modalClose').addEventListener('click',closeModal);
+    qs('#modal').addEventListener('click',e=>{ if(e.target===qs('#modal')) closeModal(); });
+
+    /* Cart */
+    function addToCart(id, qty=1){
+      state.cart[id] = (state.cart[id]||0) + qty; updateCartUI();
+      // brief toast (simple)
+      const t = document.createElement('div'); t.textContent='Added to cart'; t.style.position='fixed'; t.style.right='20px'; t.style.bottom='20px'; t.style.background='#333'; t.style.color='#fff'; t.style.padding='8px 12px'; t.style.borderRadius='6px'; document.body.appendChild(t);
+      setTimeout(()=>t.remove(),1200);
+    }
+    function updateCartUI(){
+      const items = Object.entries(state.cart).map(([id,qty])=>{
+        const p = products.find(x=>x.id==id);
+        return {id:p.id,title:p.title,price:p.price,qty,img:p.img};
+      });
+      const container = qs('#cartItems'); container.innerHTML = '';
+      let total = 0; let count = 0;
+      items.forEach(i=>{
+        total += i.price * i.qty; count += i.qty;
+        const el = document.createElement('div'); el.className='cart-item';
+        el.innerHTML = `<img src='${i.img}' alt='${i.title}' /><div style='flex:1'><div style='font-weight:600'>${i.title}</div><div>₹${i.price.toLocaleString()} x ${i.qty}</div></div><div style='display:flex;flex-direction:column;gap:6px'><button data-id='${i.id}' class='inc'>+</button><button data-id='${i.id}' class='dec'>-</button></div>`;
+        container.appendChild(el);
+      });
+      qs('#cartTotal').textContent = `₹${total.toLocaleString()}`;
+      qs('#cartCount').textContent = count;
+
+      qsa('.cart-item .inc').forEach(b=>b.addEventListener('click',e=>{ const id=e.target.dataset.id; addToCart(Number(id),1); }));
+      qsa('.cart-item .dec').forEach(b=>b.addEventListener('click',e=>{ const id=e.target.dataset.id; if(state.cart[id]>1){ state.cart[id]--; } else { delete state.cart[id]; } updateCartUI(); }));
+    }
+
+    /* Cart drawer toggles */
+    qs('#cartBtn').addEventListener('click',()=>{ qs('#cartDrawer').classList.toggle('open'); });
+    qs('#checkoutBtn').addEventListener('click',()=>alert('Checkout flow not implemented in demo'));
+
+    /* Deals & featured */
+    function initDeals(){
+      const deals = products.slice(0,3);
+      const el = qs('#deals'); el.innerHTML = '';
+      deals.forEach(d=>{ const div = document.createElement('div'); div.style.marginBottom='8px'; div.innerHTML = `<div style='font-weight:600'>${d.title}</div><div style='color:var(--muted)'>₹${d.price.toLocaleString()}</div>`; el.appendChild(div); });
+    }
+
+    /* Init everything */
+    function init(){
+      initCategories(); initCarousel(); initDeals(); applyFilters();
+      qs('#searchInput').addEventListener('keydown',e=>{ if(e.key==='Enter') qs('#searchBtn').click(); });
+    }
+
+    init();
+  </script>
+</body>
+</html>
